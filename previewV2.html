@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>台積電多情境 EPS 估值模型</title>
+  <style>
+    :root {
+      --bg: #09101f;
+      --bg2: #101932;
+      --panel: rgba(18, 25, 51, 0.94);
+      --soft: #0d1430;
+      --line: #273668;
+      --text: #eef3ff;
+      --muted: #9fb0e0;
+      --accent: #7aa2ff;
+      --accent-soft: rgba(122, 162, 255, 0.14);
+      --good: #7ce3b1;
+      --warn: #ffd27a;
+      --bad: #ffb0b0;
+      --base: #7aa2ff;
+      --opt: #7ce3b1;
+      --cons: #ffb0b0;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans TC", sans-serif;
+      color: var(--text);
+      background: linear-gradient(180deg, var(--bg), var(--bg2) 60%, var(--bg));
+      line-height: 1.55;
+    }
+    .wrap { max-width: 1360px; margin: 0 auto; padding: 28px 20px 56px; }
+    .tag {
+      display: inline-flex; align-items: center; gap: 8px;
+      border-radius: 999px; padding: 6px 12px; font-size: 12px;
+      background: var(--accent-soft); color: #bfd1ff; border: 1px solid rgba(122,162,255,.3);
+      margin-bottom: 12px;
+    }
+    h1, h2, h3 { margin: 0 0 10px; }
+    p { margin: 0; }
+    .hero { margin-bottom: 18px; }
+    .hero p { color: var(--muted); max-width: 980px; }
+    .layout { display: grid; grid-template-columns: 360px 1fr; gap: 20px; align-items: start; }
+    .panel {
+      background: var(--panel); border: 1px solid var(--line); border-radius: 20px;
+      padding: 20px; box-shadow: 0 14px 36px rgba(0,0,0,.22);
+    }
+    .note { color: var(--muted); font-size: 14px; }
+    .stack { display: grid; gap: 14px; }
+    .field { display: grid; gap: 6px; }
+    label { color: var(--muted); font-size: 14px; }
+    input[type="number"], input[type="range"] {
+      width: 100%;
+    }
+    input[type="number"] {
+      border-radius: 12px; border: 1px solid var(--line); background: var(--soft); color: var(--text);
+      padding: 12px 14px; font-size: 16px;
+    }
+    input[type="range"] { accent-color: var(--accent); }
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .small { font-size: 12px; color: var(--muted); }
+    .formula {
+      border: 1px dashed var(--line); border-radius: 16px; background: var(--soft); padding: 14px;
+      font-size: 14px; color: #dae4ff;
+    }
+    .formula code {
+      display: block; margin-top: 8px; color: var(--good); font-size: 13px; white-space: pre-wrap;
+    }
+    .scenario-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+    .scenario-card, .summary-card {
+      background: var(--soft); border: 1px solid var(--line); border-radius: 16px; padding: 16px;
+    }
+    .scenario-head, .legend-item { display: flex; align-items: center; gap: 8px; }
+    .dot { width: 12px; height: 12px; border-radius: 50%; }
+    .scenario-title { font-weight: 700; }
+    .scenario-sub { color: var(--muted); font-size: 12px; }
+    .rate-list { margin-top: 10px; display: grid; gap: 6px; font-size: 13px; }
+    .rate-item { display: flex; justify-content: space-between; gap: 10px; }
+    .rate-item span:last-child { font-variant-numeric: tabular-nums; }
+    .main-stack { display: grid; gap: 20px; }
+    .summary-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+    .summary-card .value { font-size: 30px; font-weight: 800; margin-top: 4px; }
+    .chart-box {
+      background: var(--soft); border: 1px solid var(--line); border-radius: 18px; padding: 14px;
+    }
+    svg { width: 100%; height: auto; display: block; }
+    .legend { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 10px; color: var(--muted); font-size: 13px; }
+    .legend-line { width: 20px; height: 4px; border-radius: 999px; }
+    table {
+      width: 100%; border-collapse: collapse; overflow: hidden; border-radius: 16px;
+      border: 1px solid var(--line); background: var(--soft);
+    }
+    th, td {
+      padding: 12px 10px; border-bottom: 1px solid rgba(39, 54, 104, .75); text-align: right;
+      white-space: nowrap; font-variant-numeric: tabular-nums;
+    }
+    thead th { background: rgba(122, 162, 255, .08); color: #dae4ff; }
+    th:first-child, td:first-child { text-align: left; }
+    tbody tr:last-child td { border-bottom: 0; }
+    .reason-list { display: grid; gap: 10px; }
+    .reason-item {
+      border-left: 3px solid var(--accent); padding-left: 12px; color: var(--muted); font-size: 14px;
+    }
+    .pill-row { display: flex; gap: 8px; flex-wrap: wrap; }
+    .pill {
+      border: 1px solid rgba(122,162,255,.28); background: rgba(122,162,255,.1); color: #c6d7ff;
+      padding: 6px 10px; border-radius: 999px; font-size: 12px;
+    }
+    .btns { display: flex; gap: 10px; }
+    button {
+      border: 0; border-radius: 12px; padding: 11px 16px; cursor: pointer; font-weight: 700;
+    }
+    .primary { background: var(--accent); color: #081021; }
+    .ghost { background: #1a2549; color: var(--text); border: 1px solid var(--line); }
+    @media (max-width: 1080px) {
+      .layout { grid-template-columns: 1fr; }
+      .scenario-grid, .summary-grid { grid-template-columns: 1fr; }
+      .grid2 { grid-template-columns: 1fr; }
+      .wrap { padding: 20px 14px 40px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <section class="hero">
+      <div class="tag">靜態網頁版｜多情境估值模型</div>
+      <h1>台積電 EPS × 成長率衰減曲線 × 終局 PE 模型</h1>
+      <p>這版不是把每年成長率硬寫死，而是把你給的設定值整理成「起點成長率 → 終點成長率 → 衰減曲線」模型。好處是同一套邏輯能延伸到更多年度，也能自然接上終局 PE 收斂。</p>
+    </section>
+
+    <div class="layout">
+      <aside class="panel stack">
+        <div>
+          <h2>控制台</h2>
+          <p class="note">這一區是在設定模型參數。畫面主圖、摘要卡、年度表都會跟著即時更新。</p>
+        </div>
+
+        <div class="field">
+          <label for="eps2026">2026 EPS</label>
+          <input id="eps2026" type="number" step="0.1" value="90" />
+          <div class="small">這段在做什麼：設定整個模型的 EPS 起點。</div>
+        </div>
+
+        <div class="grid2">
+          <div class="field">
+            <label for="peg">起始 PEG</label>
+            <input id="peg" type="number" step="0.05" value="1.0" />
+            <div class="small">這段在做什麼：把 2027 起始成長率轉成起始 PE。</div>
+          </div>
+          <div class="field">
+            <label for="terminalPe">終局 PE</label>
+            <input id="terminalPe" type="number" step="0.5" value="18" />
+            <div class="small">這段在做什麼：假設企業成熟後，估值最後收斂到的 PE。</div>
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="curveAlpha">成長率衰減曲線 α：<span id="curveAlphaLabel">1.3</span></label>
+          <input id="curveAlpha" type="range" min="1" max="2.5" step="0.1" value="1.3" />
+          <div class="small">這段在做什麼：α 越高，代表前期高成長維持比較久，後期才加快放緩。</div>
+        </div>
+
+        <div class="field">
+          <label for="peAlpha">PE 收斂曲線 β：<span id="peAlphaLabel">1.1</span></label>
+          <input id="peAlpha" type="range" min="0.8" max="2.2" step="0.1" value="1.1" />
+          <div class="small">這段在做什麼：控制市場願意給的本益比，如何一路收斂到終局 PE。</div>
+        </div>
+
+        <div class="btns">
+          <button id="recalcBtn" class="primary">重新計算</button>
+          <button id="resetBtn" class="ghost">回到預設</button>
+        </div>
+
+        <div class="formula">
+          這段在做什麼：把核心公式寫出來，避免黑盒。
+          <code>g_t = g_{end} + (g_{start} - g_{end}) × (1 - progress^α)</code>
+          <code>EPS_t = EPS_{t-1} × (1 + g_t)</code>
+          <code>PE_{start} = g_{start}(%) × PEG</code>
+          <code>PE_t = PE_{terminal} + (PE_{start} - PE_{terminal}) × (1 - progress^β)</code>
+          <code>Price_t = EPS_t × PE_t</code>
+        </div>
+
+        <div>
+          <h3>為什麼這樣比「手填每年值」更科學</h3>
+          <div class="reason-list">
+            <div class="reason-item">它把你的直覺設定保留下來，但改成「起點、終點、曲線」三個可解釋參數，所以不是一次性表格。</div>
+            <div class="reason-item">成長率不再被鎖死在 2027–2030，未來你要延長到 2032 或 2035，公式仍然成立。</div>
+            <div class="reason-item">同一條衰減曲線可以同步套在成長率與 PE 收斂上，敘事比較一致：成長放慢，估值也逐步回歸成熟區間。</div>
+          </div>
+        </div>
+      </aside>
+
+      <main class="main-stack">
+        <section class="panel">
+          <h2>主圖：三種情境股價路徑</h2>
+          <p class="note">這段在做什麼：把基準、樂觀、保守三條線放在同一張圖。主線加粗，其他兩條降低透明度，視覺焦點先落在基準情境。</p>
+          <div class="summary-grid" id="summaryGrid"></div>
+          <div class="chart-box" style="margin-top:14px;">
+            <svg id="priceChart" viewBox="0 0 980 500" preserveAspectRatio="none"></svg>
+          </div>
+          <div class="legend" id="chartLegend"></div>
+          <p class="note" id="chartCaption" style="margin-top:10px;"></p>
+        </section>
+
+        <section class="panel">
+          <h3>情境設定預覽</h3>
+          <p class="note">這段在做什麼：把每個情境由公式反推後的年度成長率列給你看，確認它有沒有貼近你的敘事節奏。</p>
+          <div class="scenario-grid" id="scenarioGrid"></div>
+        </section>
+
+        <section class="panel">
+          <h3>年度明細表</h3>
+          <p class="note">這段在做什麼：把每個年度的成長率、EPS、PE、股價攤開，方便你交叉比對圖表與估值結果。</p>
+          <div id="detailTable"></div>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+
+    const defaults = {
+      eps2026: 90,
+      peg: 1.0,
+      terminalPe: 18,
+      curveAlpha: 1.3,
+      peAlpha: 1.1
+    };
+
+    const scenarios = [
+      { key: 'conservative', name: '保守情境', color: '#ffb0b0', start: 24, end: 12, emphasis: 'secondary' },
+      { key: 'base', name: '基準情境', color: '#7aa2ff', start: 28, end: 16, emphasis: 'primary' },
+      { key: 'optimistic', name: '樂觀情境', color: '#7ce3b1', start: 32, end: 20, emphasis: 'secondary' }
+    ];
+
+    const years = [2026, 2027, 2028, 2029, 2030];
+
+    function fmt(value, digits = 1) {
+      return new Intl.NumberFormat('zh-TW', {
+        minimumFractionDigits: digits,
+        maximumFractionDigits: digits
+      }).format(value);
+    }
+
+    function fmtInt(value) {
+      return new Intl.NumberFormat('zh-TW', { maximumFractionDigits: 0 }).format(value);
+    }
+
+    function clamp(value, min, max) {
+      return Math.min(max, Math.max(min, value));
+    }
+
+    function progressAt(index, totalSteps) {
+      if (totalSteps <= 1) return 1;
+      return index / (totalSteps - 1);
+    }
+
+    function buildGrowthCurve(start, end, alpha, totalSteps) {
+      const result = [];
+      for (let i = 0; i < totalSteps; i++) {
+        const p = progressAt(i, totalSteps);
+        const rate = end + (start - end) * (1 - Math.pow(p, alpha));
+        result.push(rate);
+      }
+      return result;
+    }
+
+    function buildPeCurve(startPe, endPe, beta, totalSteps) {
+      const result = [];
+      for (let i = 0; i < totalSteps; i++) {
+        const p = progressAt(i, totalSteps);
+        const pe = endPe + (startPe - endPe) * (1 - Math.pow(p, beta));
+        result.push(pe);
+      }
+      return result;
+    }
+
+    function calculateScenario(config, inputs) {
+      const yearlyGrowths = buildGrowthCurve(config.start, config.end, inputs.curveAlpha, years.length - 1);
+      const startPe = config.start * inputs.peg;
+      const peCurveFuture = buildPeCurve(startPe, inputs.terminalPe, inputs.peAlpha, years.length - 1);
+      const rows = [];
+      let eps = inputs.eps2026;
+
+      rows.push({ year: 2026, growth: null, eps, pe: startPe, price: eps * startPe });
+      for (let i = 0; i < yearlyGrowths.length; i++) {
+        const growth = yearlyGrowths[i] / 100;
+        eps = eps * (1 + growth);
+        const pe = peCurveFuture[i];
+        rows.push({ year: years[i + 1], growth: yearlyGrowths[i], eps, pe, price: eps * pe });
+      }
+
+      return {
+        ...config,
+        startPe,
+        yearlyGrowths,
+        rows
+      };
+    }
+
+    function getInputs() {
+      return {
+        eps2026: Number($('eps2026').value),
+        peg: Number($('peg').value),
+        terminalPe: Number($('terminalPe').value),
+        curveAlpha: Number($('curveAlpha').value),
+        peAlpha: Number($('peAlpha').value)
+      };
+    }
+
+    function buildModel() {
+      const inputs = getInputs();
+      const results = scenarios.map(s => calculateScenario(s, inputs));
+      return { inputs, results };
+    }
+
+    function renderSummary(model) {
+      const base = model.results.find(s => s.key === 'base');
+      const opt = model.results.find(s => s.key === 'optimistic');
+      const cons = model.results.find(s => s.key === 'conservative');
+
+      $('summaryGrid').innerHTML = `
+        <div class="summary-card">
+          <div class="small">2030 基準情境股價</div>
+          <div class="value">${fmtInt(base.rows.at(-1).price)}</div>
+          <div class="note">這段在做什麼：把主線的最終估值當成第一觀察點。</div>
+        </div>
+        <div class="summary-card">
+          <div class="small">2030 樂觀 / 保守區間</div>
+          <div class="value">${fmtInt(cons.rows.at(-1).price)} – ${fmtInt(opt.rows.at(-1).price)}</div>
+          <div class="note">這段在做什麼：直接看同一 EPS 起點下的上下界。</div>
+        </div>
+        <div class="summary-card">
+          <div class="small">基準起始 PE → 終局 PE</div>
+          <div class="value">${fmt(base.startPe, 1)}x → ${fmt(model.inputs.terminalPe, 1)}x</div>
+          <div class="note">這段在做什麼：提醒使用者這不是只看成長，也看估值收斂。</div>
+        </div>
+      `;
+    }
+
+    function renderScenarioCards(model) {
+      $('scenarioGrid').innerHTML = model.results.map(s => {
+        const rates = s.rows.slice(1).map(r => `
+          <div class="rate-item"><span>${r.year}</span><span>${fmt(r.growth, 1)}%</span></div>
+        `).join('');
+        return `
+          <div class="scenario-card">
+            <div class="scenario-head">
+              <span class="dot" style="background:${s.color}"></span>
+              <div>
+                <div class="scenario-title">${s.name}</div>
+                <div class="scenario-sub">起點 ${fmt(s.start, 0)}% → 終點 ${fmt(s.end, 0)}%</div>
+              </div>
+            </div>
+            <div class="pill-row" style="margin-top:10px;">
+              <span class="pill">起始 PE ${fmt(s.startPe, 1)}x</span>
+              <span class="pill">2030 PE ${fmt(s.rows.at(-1).pe, 1)}x</span>
+            </div>
+            <div class="rate-list">${rates}</div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function renderDetailTable(model) {
+      const base = model.results.find(s => s.key === 'base');
+      const opt = model.results.find(s => s.key === 'optimistic');
+      const cons = model.results.find(s => s.key === 'conservative');
+
+      const rows = years.map((year, index) => {
+        const b = base.rows[index];
+        const o = opt.rows[index];
+        const c = cons.rows[index];
+        return `
+          <tr>
+            <td>${year}</td>
+            <td>${b.growth == null ? '—' : fmt(b.growth, 1) + '%'}</td>
+            <td>${fmt(b.eps, 2)}</td>
+            <td>${fmt(b.pe, 1)}x</td>
+            <td>${fmtInt(b.price)}</td>
+            <td>${fmtInt(o.price)}</td>
+            <td>${fmtInt(c.price)}</td>
+          </tr>
+        `;
+      }).join('');
+
+      $('detailTable').innerHTML = `
+        <table>
+          <thead>
+            <tr>
+              <th>年度</th>
+              <th>基準成長率</th>
+              <th>基準 EPS</th>
+              <th>基準 PE</th>
+              <th>基準股價</th>
+              <th>樂觀股價</th>
+              <th>保守股價</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      `;
+    }
+
+    function renderChart(model) {
+      const svg = $('priceChart');
+      const width = 980;
+      const height = 500;
+      const padding = { top: 28, right: 40, bottom: 60, left: 84 };
+      const allRows = model.results.flatMap(s => s.rows);
+      const xMin = years[0];
+      const xMax = years.at(-1);
+      const prices = allRows.map(r => r.price);
+      const minPrice = Math.min(...prices);
+      const maxPrice = Math.max(...prices);
+      const yMin = Math.floor((minPrice * 0.92) / 50) * 50;
+      const yMax = Math.ceil((maxPrice * 1.05) / 50) * 50;
+      const innerW = width - padding.left - padding.right;
+      const innerH = height - padding.top - padding.bottom;
+      const x = (year) => padding.left + ((year - xMin) / (xMax - xMin || 1)) * innerW;
+      const y = (price) => height - padding.bottom - ((price - yMin) / (yMax - yMin || 1)) * innerH;
+
+      const yTicks = 5;
+      const yGrid = Array.from({ length: yTicks + 1 }, (_, i) => {
+        const value = yMin + ((yMax - yMin) / yTicks) * i;
+        const yy = y(value);
+        return `
+          <line x1="${padding.left}" y1="${yy}" x2="${width - padding.right}" y2="${yy}" stroke="rgba(159,176,224,.16)" />
+          <text x="${padding.left - 12}" y="${yy + 4}" fill="#9fb0e0" font-size="12" text-anchor="end">${fmtInt(value)}</text>
+        `;
+      }).join('');
+
+      const xGrid = years.map(year => `
+        <line x1="${x(year)}" y1="${padding.top}" x2="${x(year)}" y2="${height - padding.bottom}" stroke="rgba(159,176,224,.07)" />
+        <text x="${x(year)}" y="${height - padding.bottom + 24}" fill="#9fb0e0" font-size="12" text-anchor="middle">${year}</text>
+      `).join('');
+
+      const lines = model.results.map(series => {
+        const path = series.rows.map((row, index) => `${index === 0 ? 'M' : 'L'}${x(row.year).toFixed(2)},${y(row.price).toFixed(2)}`).join(' ');
+        const primary = series.emphasis === 'primary';
+        const strokeWidth = primary ? 5 : 2.6;
+        const opacity = primary ? 1 : 0.38;
+        const dots = series.rows.map(row => {
+          const radius = primary ? 4.5 : 3.2;
+          return `<circle cx="${x(row.year)}" cy="${y(row.price)}" r="${radius}" fill="${series.color}" opacity="${primary ? 1 : 0.55}" />`;
+        }).join('');
+        const last = series.rows.at(-1);
+        return `
+          <path d="${path}" fill="none" stroke="${series.color}" stroke-width="${strokeWidth}" opacity="${opacity}" stroke-linecap="round" stroke-linejoin="round" />
+          ${dots}
+          <text x="${x(last.year) + 10}" y="${y(last.price) + (primary ? -8 : 12)}" fill="${series.color}" font-size="12" opacity="${primary ? 1 : .7}">${series.name}</text>
+        `;
+      }).join('');
+
+      svg.innerHTML = `
+        <rect x="0" y="0" width="${width}" height="${height}" rx="18" fill="#0d1430" />
+        ${yGrid}
+        ${xGrid}
+        <line x1="${padding.left}" y1="${height - padding.bottom}" x2="${width - padding.right}" y2="${height - padding.bottom}" stroke="#9fb0e0" stroke-width="1.2" />
+        <line x1="${padding.left}" y1="${padding.top}" x2="${padding.left}" y2="${height - padding.bottom}" stroke="#9fb0e0" stroke-width="1.2" />
+        <text x="${width / 2}" y="${height - 16}" fill="#9fb0e0" font-size="13" text-anchor="middle">年份</text>
+        <text x="22" y="${height / 2}" fill="#9fb0e0" font-size="13" text-anchor="middle" transform="rotate(-90 22 ${height / 2})">股價</text>
+        ${lines}
+      `;
+
+      $('chartLegend').innerHTML = model.results.map(series => `
+        <div class="legend-item">
+          <span class="legend-line" style="background:${series.color}; opacity:${series.emphasis === 'primary' ? 1 : .45}"></span>
+          <span>${series.name}：2027 起始成長 ${fmt(series.start, 0)}%，2030 終點成長 ${fmt(series.end, 0)}%</span>
+        </div>
+      `).join('');
+
+      $('chartCaption').textContent = `這段在做什麼：主線是基準情境，線條加粗；樂觀與保守只作為對照。Y 軸採動態縮放，不從 0 起跳，所以更容易看出三條路徑的斜率差異。`;
+    }
+
+    function renderAll() {
+      $('curveAlphaLabel').textContent = Number($('curveAlpha').value).toFixed(1);
+      $('peAlphaLabel').textContent = Number($('peAlpha').value).toFixed(1);
+      const model = buildModel();
+      renderSummary(model);
+      renderScenarioCards(model);
+      renderDetailTable(model);
+      renderChart(model);
+    }
+
+    function resetDefaults() {
+      $('eps2026').value = defaults.eps2026;
+      $('peg').value = defaults.peg;
+      $('terminalPe').value = defaults.terminalPe;
+      $('curveAlpha').value = defaults.curveAlpha;
+      $('peAlpha').value = defaults.peAlpha;
+      renderAll();
+    }
+
+    $('recalcBtn').addEventListener('click', renderAll);
+    $('resetBtn').addEventListener('click', resetDefaults);
+    ['eps2026', 'peg', 'terminalPe', 'curveAlpha', 'peAlpha'].forEach(id => {
+      $(id).addEventListener('input', renderAll);
+    });
+
+    renderAll();
+  </script>
+</body>
+</html>
